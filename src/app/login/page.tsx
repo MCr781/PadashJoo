@@ -1,4 +1,4 @@
-"use client"; // 1. This makes it interactive
+"use client";
 
 import { login, signup } from './actions';
 import { toast } from "sonner";
@@ -10,6 +10,8 @@ export default function LoginPage() {
   // Wrapper to handle Login
   const handleLogin = async (formData: FormData) => {
     setLoading(true);
+    // We call the server action directly here. 
+    // Since this is a client component, we aren't passing this function directly to the form's action prop in a way that causes the type mismatch.
     const result = await login(formData);
     setLoading(false);
     
@@ -64,6 +66,7 @@ export default function LoginPage() {
 
                 <div className="flex flex-col gap-3 mt-6">
                     <button 
+                        // We use formAction to bind the button click to our handler
                         formAction={handleLogin}
                         disabled={loading}
                         className="w-full py-3.5 bg-primary-600 text-white font-bold rounded-xl hover:bg-primary-700 transition shadow-lg shadow-primary-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
