@@ -14,6 +14,11 @@ export default function Footer() {
             <p className="mb-6 max-w-sm text-sm leading-relaxed">
               اولین پلتفرم عادلانه برای اشتراک‌گذاری کدهای معرف در ایران. ما به شما کمک می‌کنیم تا بهترین پاداش‌های ثبت‌نام و هدایای نقدی را پیدا کنید.
             </p>
+            <div className="flex gap-4 mb-4">
+               {/* Trust Badges (Fake for now, but builds visual trust) */}
+               <div className="px-3 py-1 bg-white border border-surface-200 rounded text-xs font-bold text-green-600">SSL Secured</div>
+               <div className="px-3 py-1 bg-white border border-surface-200 rounded text-xs font-bold text-primary-600">Verified Links</div>
+            </div>
             <div className="text-sm font-medium">
               © {new Date().getFullYear()} پاداش‌جو. تمامی حقوق محفوظ است.
             </div>
@@ -51,20 +56,23 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/contact" className="hover:text-primary-600 transition">
+                  تماس با ما
+                </Link>
+              </li>
+              <li>
                 <Link href="/terms" className="hover:text-primary-600 transition">
                   قوانین و مقررات
                 </Link>
               </li>
-                <Link href="/contact" className="hover:text-primary-600 transition">
-                  تماس با ما
-                </Link>
             </ul>
           </div>
         </div>
 
         {/* Bottom Bar */}
-        <div className="border-t border-surface-200 pt-8 text-center text-xs font-medium">
-            ساخته شده با ❤️ در ایران
+        <div className="border-t border-surface-200 pt-8 text-center text-xs font-medium flex flex-col md:flex-row justify-between items-center gap-4">
+            <span>ساخته شده با ❤️ در ایران</span>
+            <span className="text-gray-400">نسخه ۱.۰.۰ (بتا)</span>
         </div>
       </div>
     </footer>

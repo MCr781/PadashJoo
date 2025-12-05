@@ -14,14 +14,17 @@ async function checkLinkHealth(url: string) {
     const response = await fetch(url, {
       method: 'HEAD', // Just check headers, don't download the whole page
       signal: controller.signal,
-      headers: { 'User-Agent': 'PadashJoo-Bot/1.0' }
+      headers: { 
+        'User-Agent': 'Mozilla/5.0 (compatible; PadashJooBot/1.0)' 
+      }
     });
     
     clearTimeout(timeoutId);
-    return response.ok; // Returns true if status is 200-299
+    // Returns true if status is 200-299 (OK)
+    return response.ok; 
   } catch (error) {
     console.error("Link health check failed:", error);
-    return false; // Assume broken if fetch fails (e.g. DNS error)
+    return false; // Assume broken if fetch fails
   }
 }
 
@@ -56,13 +59,11 @@ export async function submitLink(prevState: any, formData: FormData) {
   }
 
   // Rule B: Real-World Health Check (The "Guard Dog")
-  // We check if the link actually exists on the internet
   const isAlive = await checkLinkHealth(referral_url);
   if (!isAlive) {
       return { error: "این لینک در دسترس نیست یا خراب است. لطفاً لینک سالم وارد کنید.", success: false };
   }
   // --- 🛡️ SECURITY SHIELD END ---
-
 
   // 3. Database Insertion
   const { error } = await supabase.from("links").insert({

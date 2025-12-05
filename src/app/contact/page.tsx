@@ -17,7 +17,7 @@ export default function ContactPage() {
         </p>
 
         <div className="grid gap-6">
-            {/* Email Option */}
+            {/* Email Option - UPDATED */}
             <a 
                 href="mailto:support@padashjoo.ir" 
                 className="group flex items-center justify-between p-6 rounded-2xl border border-surface-200 hover:border-primary-200 hover:bg-primary-50 transition"
@@ -28,13 +28,13 @@ export default function ContactPage() {
                     </div>
                     <div className="text-right">
                         <h3 className="font-bold text-surface-900">ارسال ایمیل</h3>
-                        <p className="text-sm text-gray-500">پاسخگویی در ۲۴ ساعت</p>
+                        <p className="text-sm text-gray-500">support@padashjoo.ir</p>
                     </div>
                 </div>
-                <span className="text-primary-600 font-bold group-hover:translate-x-1 transition">support@padashjoo.ir</span>
+                <span className="text-primary-600 font-bold group-hover:translate-x-1 transition">ارسال پیام</span>
             </a>
 
-            {/* Telegram Option (If you have one) */}
+            {/* Telegram Option */}
             <a 
                 href="https://t.me/YOUR_TELEGRAM_ID" 
                 target="_blank"

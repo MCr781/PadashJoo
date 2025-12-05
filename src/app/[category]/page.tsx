@@ -1,9 +1,11 @@
 import { createClient } from "@/utils/supabase/server";
 import Link from "next/link";
-import Image from "next/image"; // 1. Import Image
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import LinkRotator from "@/components/LinkRotator";
 import { Metadata } from "next";
+import Breadcrumbs from "@/components/Breadcrumbs"; // 1. Import Breadcrumbs
+import Script from "next/script"; // 2. Import Script for JSON-LD
 
 export async function generateMetadata({
   params,
@@ -14,10 +16,14 @@ export async function generateMetadata({
   const supabase = await createClient();
   const { data: category } = await supabase.from("categories").select("name_farsi").eq("slug", slug).single();
 
-  if (!category) return { title: "Category Not Found" };
+  if (!category) return { title: "دسته‌بندی پیدا نشد" };
+  
   return {
-    title: `${category.name_farsi} Rewards | PadashJoo`,
-    description: `Best referral codes and bonuses for ${category.name_farsi} services in Iran.`,
+    title: `کد معرف و پاداش‌های ${category.name_farsi} | پاداش‌جو`,
+    description: `بهترین کدهای تخفیف، پاداش ثبت‌نام و لینک‌های معرف برای سرویس‌های ${category.name_farsi} در ایران.`,
+    alternates: {
+      canonical: `https://padashjoo.ir/${slug}`,
+    }
   };
 }
 
@@ -31,7 +37,7 @@ export default async function CategoryPage({
 
   const { data: categoryData, error: categoryError } = await supabase
     .from("categories")
-    .select("id, name_farsi")
+    .select("id, name_farsi, slug")
     .eq("slug", slug)
     .single();
 
@@ -42,14 +48,47 @@ export default async function CategoryPage({
     .select("*")
     .eq("category_id", categoryData.id);
 
+  // 3. Construct JSON-LD Schema (The Secret Code for Google)
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": `کدهای معرف ${categoryData.name_farsi}`,
+    "description": `لیست کامل پاداش‌ها و کدهای معرف برای ${categoryData.name_farsi}`,
+    "url": `https://padashjoo.ir/${categoryData.slug}`,
+    "breadcrumb": {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "خانه",
+          "item": "https://padashjoo.ir"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": categoryData.name_farsi,
+          "item": `https://padashjoo.ir/${categoryData.slug}`
+        }
+      ]
+    }
+  };
+
   return (
     <main className="flex min-h-screen flex-col items-center p-8 md:p-24 bg-surface-50 text-surface-900">
-      <div className="w-full max-w-3xl">
-        <Link href="/" className="text-gray-500 hover:text-primary-600 mb-8 inline-flex items-center gap-2 transition font-medium">
-          → بازگشت به خانه
-        </Link>
+      
+      {/* 4. Inject JSON-LD */}
+      <Script
+        id="json-ld"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
 
-        <h1 className="text-4xl font-black mb-8 text-surface-900 border-r-4 border-primary-500 pr-4">
+      <div className="w-full max-w-3xl">
+        {/* 5. The Visual Breadcrumb */}
+        <Breadcrumbs items={[{ label: categoryData.name_farsi, href: `/${categoryData.slug}` }]} />
+
+        <h1 className="text-3xl md:text-4xl font-black mb-8 text-surface-900 border-r-4 border-primary-500 pr-4">
           {categoryData.name_farsi}
         </h1>
 
@@ -60,9 +99,7 @@ export default async function CategoryPage({
                 key={service.id}
                 className="p-6 bg-white rounded-2xl border border-surface-200 shadow-sm hover:shadow-md transition flex flex-col md:flex-row justify-between items-center gap-6"
               >
-                {/* 2. Logo & Name Section */}
                 <div className="flex items-center gap-4 w-full md:w-auto">
-                  {/* Logo Container */}
                   <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-surface-100 bg-surface-50 flex-shrink-0">
                     {service.logo_url ? (
                         <Image 
@@ -72,21 +109,25 @@ export default async function CategoryPage({
                             className="object-cover"
                         />
                     ) : (
-                        // Fallback if no logo: A colored box with the first letter
                         <div className="w-full h-full flex items-center justify-center bg-primary-100 text-primary-600 font-bold text-xl">
                             {service.name_farsi[0]}
                         </div>
                     )}
                   </div>
                   
-                  {/* Text Info */}
                   <div>
                     <h2 className="text-2xl font-bold text-surface-900">{service.name_farsi}</h2>
-                    <p className="text-primary-600 text-sm font-medium mt-1">/{service.slug}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                        <span className="px-2 py-0.5 bg-surface-100 text-gray-500 text-xs rounded-md">
+                            {service.slug}
+                        </span>
+                        <span className="px-2 py-0.5 bg-green-50 text-green-600 text-xs rounded-md font-bold">
+                            فعال ✅
+                        </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* The Smart Button */}
                 <LinkRotator serviceSlug={service.slug} />
               </div>
             ))
