@@ -3,16 +3,13 @@
 import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
 
-// Note: We added 'prevState' as the first argument because useActionState sends it automatically
 export async function submitLink(prevState: any, formData: FormData) {
   const supabase = await createClient();
 
   // 1. Check Auth
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    // If somehow a non-logged-in user submits, redirect them
     redirect("/login");
   }
 
@@ -23,21 +20,18 @@ export async function submitLink(prevState: any, formData: FormData) {
 
   // --- 🛡️ SECURITY SHIELD START ---
   
-  // Rule A: Length Check
   if (!referral_url || referral_url.length > 200) {
-      return { error: "لینک معتبر نیست یا خالی است." };
+      return { error: "Link is too long or empty.", success: false };
   }
 
-  // Rule B: HTTPS Check (Crucial for security)
   if (!referral_url.startsWith("https://")) {
-      return { error: "فقط لینک‌های امن (https) مجاز هستند." };
+      return { error: "Only secure (https://) links are allowed.", success: false };
   }
 
-  // Rule C: Structure Check
   try {
       new URL(referral_url);
   } catch (e) {
-      return { error: "لطفاً یک آدرس معتبر وارد کنید." };
+      return { error: "Please enter a valid URL.", success: false };
   }
   // --- 🛡️ SECURITY SHIELD END ---
 
@@ -53,69 +47,20 @@ export async function submitLink(prevState: any, formData: FormData) {
 
   // 4. Handle Specific Database Errors
   if (error) {
-    // Postgres Error 23505 = Unique Violation (Duplicate Data)
     if (error.code === '23505') { 
         if (error.message.includes('unique_user_per_service')) {
-            return { error: "شما قبلاً برای این سرویس لینک ثبت کرده‌اید! به داشبورد مراجعه کنید." };
+            return { error: "You already have a link for this service! Check your dashboard.", success: false };
         }
         if (error.message.includes('unique_referral_url')) {
-            return { error: "این لینک قبلاً توسط کاربر دیگری ثبت شده است." };
+            return { error: "This link is already registered by another user.", success: false };
         }
     }
     
-    // Generic Error
     console.log("Error submitting link:", error);
-    return { error: "Database Error: Failed to submit link." };
+    return { error: "Database Error: Failed to submit link.", success: false };
   }
 
   // 5. Success
   revalidatePath("/dashboard");
-  return { success: true };
-}
-
-export async function deleteLink(linkId: string) {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Unauthorized" };
-
-  // Delete the link ONLY if it belongs to this user
-  const { error } = await supabase
-    .from("links")
-    .delete()
-    .eq("id", linkId)
-    .eq("user_id", user.id); // Security check
-
-  if (error) {
-    console.error("Delete error:", error);
-    return { error: "Failed to delete link." };
-  }
-
-  revalidatePath("/dashboard");
-  return { success: true };
-}
-
-export async function trackClick(linkId: string) {
-  const supabase = await createClient();
-  
-  // 1. Generate Fingerprint (IP + User Agent)
-  const headerStore = await headers();
-  const ip = headerStore.get("x-forwarded-for") || "unknown";
-  const userAgent = headerStore.get("user-agent") || "unknown";
-  const clickerIdentifier = `${ip}-${userAgent}`;
-
-  // 2. Try to record the click in the "Shield" table
-  const { error } = await supabase
-    .from("link_clicks")
-    .insert({
-        link_id: linkId,
-        clicker_identifier: clickerIdentifier
-    });
-
-  // 3. ONLY if the shield lets it through (no error), count it!
-  if (!error) {
-      await supabase.rpc('increment_click', { row_id: linkId });
-  } else {
-      console.log("Duplicate click filtered.");
-  }
+  return { error: "", success: true };
 }
