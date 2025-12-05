@@ -1,6 +1,34 @@
-import { login, signup } from './actions'
+"use client"; // 1. This makes it interactive
+
+import { login, signup } from './actions';
+import { toast } from "sonner";
+import { useState } from 'react';
 
 export default function LoginPage() {
+  const [loading, setLoading] = useState(false);
+
+  // Wrapper to handle Login
+  const handleLogin = async (formData: FormData) => {
+    setLoading(true);
+    const result = await login(formData);
+    setLoading(false);
+    
+    if (result?.error) {
+      toast.error(result.error);
+    }
+  };
+
+  // Wrapper to handle Signup
+  const handleSignup = async (formData: FormData) => {
+    setLoading(true);
+    const result = await signup(formData);
+    setLoading(false);
+
+    if (result?.error) {
+      toast.error(result.error);
+    }
+  };
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-6 bg-surface-50">
         <div className="w-full max-w-md p-8 bg-white rounded-2xl border border-surface-200 shadow-xl">
@@ -36,14 +64,16 @@ export default function LoginPage() {
 
                 <div className="flex flex-col gap-3 mt-6">
                     <button 
-                        formAction={login} 
-                        className="w-full py-3.5 bg-primary-600 text-white font-bold rounded-xl hover:bg-primary-700 transition shadow-lg shadow-primary-600/20"
+                        formAction={handleLogin}
+                        disabled={loading}
+                        className="w-full py-3.5 bg-primary-600 text-white font-bold rounded-xl hover:bg-primary-700 transition shadow-lg shadow-primary-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        ورود به حساب
+                        {loading ? "لطفا صبر کنید..." : "ورود به حساب"}
                     </button>
                     <button 
-                        formAction={signup} 
-                        className="w-full py-3.5 bg-white text-gray-700 font-bold rounded-xl border border-surface-200 hover:bg-surface-50 transition"
+                        formAction={handleSignup}
+                        disabled={loading}
+                        className="w-full py-3.5 bg-white text-gray-700 font-bold rounded-xl border border-surface-200 hover:bg-surface-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         ثبت‌نام جدید
                     </button>
