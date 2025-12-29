@@ -4,6 +4,19 @@ import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+// 1. ایمپورت‌های جدید
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
+
+// 2. تنظیم ردیس (مطمئن شوید متغیرهای محیطی UPSTASH_REDIS_REST_URL و TOKEN ست شده باشند)
+const redis = Redis.fromEnv();
+
+// 3. تعریف قانون محدودیت: مثلاً ۳ لینک در هر ۱ ساعت
+const ratelimit = new Ratelimit({
+  redis: redis,
+  limiter: Ratelimit.slidingWindow(3, "1 h"), 
+  analytics: true, 
+});
 
 // --- HELPER: Check if a link is alive ---
 async function checkLinkHealth(url: string) {
@@ -32,7 +45,6 @@ async function checkLinkHealth(url: string) {
 export async function submitLink(prevState: any, formData: FormData) {
   const supabase = await createClient();
 
-  // 1. Check Auth
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     redirect("/login");
@@ -43,27 +55,19 @@ export async function submitLink(prevState: any, formData: FormData) {
   const referral_url = formData.get("referral_url") as string;
   const bonus_description = formData.get("bonus_description") as string;
 
-  // --- 🛡️ SECURITY SHIELD START ---
+// --- 🛡️ RATE LIMIT CHECK START ---
+  // ما از user.id به عنوان کلید استفاده می‌کنیم تا هر کاربر محدود شود
+  const { success, limit, reset, remaining } = await ratelimit.limit(`submit_link_${user.id}`);
   
-  // Rule A: Syntax Checks
-  if (!referral_url || referral_url.length > 200) {
-      return { error: "لینک معتبر نیست یا خالی است.", success: false };
+  if (!success) {
+    // محاسبه زمان باقی‌مانده به دقیقه
+    const minutesLeft = Math.ceil((reset - Date.now()) / 60000);
+    return { 
+        error: `شما بیش از حد مجاز تلاش کرده‌اید. لطفاً ${minutesLeft} دقیقه دیگر امتحان کنید.`, 
+        success: false 
+    };
   }
-  if (!referral_url.startsWith("https://")) {
-      return { error: "فقط لینک‌های امن (https) مجاز هستند.", success: false };
-  }
-  try {
-      new URL(referral_url);
-  } catch (e) {
-      return { error: "لطفاً یک آدرس معتبر وارد کنید.", success: false };
-  }
-
-  // Rule B: Real-World Health Check (The "Guard Dog")
-  const isAlive = await checkLinkHealth(referral_url);
-  if (!isAlive) {
-      return { error: "این لینک در دسترس نیست یا خراب است. لطفاً لینک سالم وارد کنید.", success: false };
-  }
-  // --- 🛡️ SECURITY SHIELD END ---
+  // --- 🛡️ RATE LIMIT CHECK END ---
 
   // 3. Database Insertion
   const { error } = await supabase.from("links").insert({

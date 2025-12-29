@@ -6,8 +6,10 @@ import { useState } from "react";
 // I'm using your fixed path here!
 import { voteLink } from "@/app/vote_actions"; 
 import { trackClick } from "@/app/dashboard/actions";
+import { useReliableTrack } from "@/hooks/useReliableTrack";
 
 export default function LinkRotator({ serviceSlug }: { serviceSlug: string }) {
+  const trackLink = useReliableTrack();
   const [link, setLink] = useState<{ id: string; url: string; desc: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -75,7 +77,7 @@ export default function LinkRotator({ serviceSlug }: { serviceSlug: string }) {
                     rel="noopener noreferrer"
                     onClick={() => {
                         setLinkClicked(true);
-                        trackClick(link.id);
+                        trackLink(link.id);
                     }}
                     // Changed back to Emerald Green (The "Money" Color)
                     className="px-6 py-2 bg-action-500 text-white font-bold rounded-xl hover:bg-action-600 transition shadow-lg shadow-action-500/20"
