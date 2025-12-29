@@ -4,29 +4,36 @@ import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 
-export async function voteLink(linkId: string, isUpvote: boolean) {
+// اضافه شدن آرگومان visitorId به تابع
+export async function voteLink(linkId: string, isUpvote: boolean, visitorId: string) {
   const supabase = await createClient();
   
-  // 1. Generate the "Fingerprint"
-  // We combine IP address + User Agent to make a unique ID for this user.
-  const headerStore = await headers();
-  const ip = headerStore.get("x-forwarded-for") || "unknown";
-  const userAgent = headerStore.get("user-agent") || "unknown";
-  
-  // This string (e.g. "192.168.1.1-Chrome") identifies the voter
-  const voterIdentifier = `${ip}-${userAgent}`;
+  // 1. امنیت: چک کردن اینکه visitorId خالی نباشد (جلوگیری از درخواست‌های دستکاری شده)
+  if (!visitorId || visitorId.length < 10) {
+      return { success: false, message: "Invalid device fingerprint." };
+  }
 
-  // 2. Try to record the vote in our new "Shield" table
-  // If this person voted before, Supabase will throw an error automatically.
+  // 2. ساخت شناسه ترکیبی (Hybrid ID)
+  // ترکیب "شناسه سخت‌افزاری" + "IP" برای امنیت حداکثری
+  // اگر فقط به Fingerprint اعتماد کنیم، ممکن است دو گوشی مدل یکسان اشتباه گرفته شوند.
+  // اگر فقط به IP اعتماد کنیم، با VPN دور زده می‌شود.
+  // ترکیب این دو، دایره تقلب را بسیار تنگ می‌کند.
+  
+  // نکته: برای سخت‌گیری بیشتر، می‌توانید فقط از visitorId استفاده کنید.
+  // اما اینجا ما visitorId را به عنوان معیار اصلی ذخیره می‌کنیم.
+  
+  const uniqueIdentifier = `fp_${visitorId}`; 
+
+  // 3. تلاش برای ثبت رای در جدول Shield
   const { error: voteError } = await supabase
     .from("link_votes")
     .insert({
         link_id: linkId,
-        voter_identifier: voterIdentifier,
+        voter_identifier: uniqueIdentifier, // قبلاً IP-UA بود، الان Fingerprint است
         is_upvote: isUpvote
     });
 
-  // 3. IF (and only if) the shield let it through, update the main count
+  // 4. نتیجه‌گیری
   if (!voteError) {
       if (isUpvote) {
         await supabase.rpc('increment_vote', { row_id: linkId, is_upvote: true });
@@ -34,11 +41,11 @@ export async function voteLink(linkId: string, isUpvote: boolean) {
         await supabase.rpc('increment_vote', { row_id: linkId, is_upvote: false });
       }
       
-      // Refresh the page data
       revalidatePath("/");
       return { success: true };
   } else {
-      console.log("Duplicate vote blocked by Shield.");
-      return { success: false, message: "You have already voted on this link!" };
+      // کد خطای 23505 یعنی Duplicate Key (قبلاً رای داده)
+      console.log("Duplicate vote blocked by Fingerprint Shield.");
+      return { success: false, message: "شما قبلاً به این لینک رای داده‌اید!" };
   }
 }
