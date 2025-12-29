@@ -2,50 +2,55 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 
-// اضافه شدن آرگومان visitorId به تابع
 export async function voteLink(linkId: string, isUpvote: boolean, visitorId: string) {
   const supabase = await createClient();
   
-  // 1. امنیت: چک کردن اینکه visitorId خالی نباشد (جلوگیری از درخواست‌های دستکاری شده)
-  if (!visitorId || visitorId.length < 10) {
-      return { success: false, message: "Invalid device fingerprint." };
+  // 1. چک کردن اینکه آیا کاربر لاگین است؟
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // 2. تعیین شناسه نهایی (The Root Identifier)
+  let voterIdentifier: string;
+  let isRealUser = false;
+
+  if (user) {
+    // ✅ اگر لاگین بود: از ID واقعی و غیرقابل تغییر استفاده کن
+    voterIdentifier = user.id;
+    isRealUser = true;
+  } else {
+    // 🕵️ اگر مهمان بود: از Fingerprint استفاده کن (Shadow User)
+    if (!visitorId || visitorId.length < 5) {
+         return { success: false, message: "Invalid device fingerprint." };
+    }
+    voterIdentifier = `fp_${visitorId}`;
   }
 
-  // 2. ساخت شناسه ترکیبی (Hybrid ID)
-  // ترکیب "شناسه سخت‌افزاری" + "IP" برای امنیت حداکثری
-  // اگر فقط به Fingerprint اعتماد کنیم، ممکن است دو گوشی مدل یکسان اشتباه گرفته شوند.
-  // اگر فقط به IP اعتماد کنیم، با VPN دور زده می‌شود.
-  // ترکیب این دو، دایره تقلب را بسیار تنگ می‌کند.
-  
-  // نکته: برای سخت‌گیری بیشتر، می‌توانید فقط از visitorId استفاده کنید.
-  // اما اینجا ما visitorId را به عنوان معیار اصلی ذخیره می‌کنیم.
-  
-  const uniqueIdentifier = `fp_${visitorId}`; 
-
-  // 3. تلاش برای ثبت رای در جدول Shield
+  // 3. ثبت رای در جدول Shield
+  // نکته: ما از همان جدول link_votes استفاده می‌کنیم اما حالا شناسه دقیق‌تر است.
   const { error: voteError } = await supabase
     .from("link_votes")
     .insert({
         link_id: linkId,
-        voter_identifier: uniqueIdentifier, // قبلاً IP-UA بود، الان Fingerprint است
+        voter_identifier: voterIdentifier, 
         is_upvote: isUpvote
+        // می‌توانید در آینده یک ستون is_shadow هم اضافه کنید تا رای‌های مهمان را جدا کنید
     });
 
-  // 4. نتیجه‌گیری
   if (!voteError) {
-      if (isUpvote) {
-        await supabase.rpc('increment_vote', { row_id: linkId, is_upvote: true });
-      } else {
-        await supabase.rpc('increment_vote', { row_id: linkId, is_upvote: false });
-      }
+      // 4. اعمال تاثیر رای
+      // اینجا می‌توانیم لاژیک "Shadow Vote" را اعمال کنیم
+      // مثلا: اگر RealUser بود، 3 امتیاز بده، اگر Guest بود 1 امتیاز.
+      // فعلا همان استاندارد را می‌رویم:
+      
+      const rpcName = isUpvote ? 'increment_vote' : 'increment_vote_down'; // فرض کنیم تابع down هم دارید
+      
+      // اگر rpc شما فقط increment_vote است و boolean می‌گیرد:
+      await supabase.rpc('increment_vote', { row_id: linkId, is_upvote: isUpvote });
       
       revalidatePath("/");
       return { success: true };
   } else {
-      // کد خطای 23505 یعنی Duplicate Key (قبلاً رای داده)
-      console.log("Duplicate vote blocked by Fingerprint Shield.");
+      console.log("Duplicate vote blocked.");
       return { success: false, message: "شما قبلاً به این لینک رای داده‌اید!" };
   }
 }
